@@ -4,7 +4,7 @@ from os import getenv
 from aiogram.enums import ChatMemberStatus
 from aiogram.types import ChatMemberUpdated
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, Router, F
 
 from source.handlers.text_message_handler import TextMessageHandler
 from source.repositories.manager import orm_repository_manager_factory
@@ -17,9 +17,9 @@ load_dotenv()
 
 bot = Bot(token=getenv("API_TOKEN"))
 dp = Dispatcher(bot=bot)
+router = Router()
 
 
-@dp.message()
 async def text_message(message: types.Message):
     if message.content_type != types.ContentType.TEXT:
         return
@@ -36,13 +36,13 @@ async def text_message(message: types.Message):
             service_update_chat=ServiceUpdateChat(
                 repository=repository_manager.get_chat_repository()
             ),
-            chat_id=message.chat.id,
-            text=message.text,
-            bot=bot
+            message=message,
+            bot=bot,
+            router=router
         )
         await handler.handle()
 
-@dp.my_chat_member()
+
 async def bot_added_to_chat(event: ChatMemberUpdated):
     if event.new_chat_member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR] \
             or event.old_chat_member.status not in [ChatMemberStatus.LEFT, ChatMemberStatus.KICKED]:
@@ -57,8 +57,14 @@ async def bot_added_to_chat(event: ChatMemberUpdated):
         )
         await service.greetings()
 
+async def get_message(message: types.Message) -> None:
+    await message.reply("сообщение после добавления")
+
 
 async def main():
+    router.message.register(text_message, F.text.startswith("кря "))
+    dp.include_router(router)
+
     await bot.delete_webhook()
     await dp.start_polling(bot)
 
